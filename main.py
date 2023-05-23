@@ -160,7 +160,7 @@ selected_name = StringVar(window)
 
 canvas = Canvas(
     window,
-    bg="#1A253B",
+    bg="#5fad9e",
     height=600,
     width=1048,
     bd=0,
@@ -351,16 +351,10 @@ btn_start_project_creation.place(
     height=61.0
 )
 
-entry_log_image = PhotoImage(
-    file=relative_to_assets("entry_log.png"))
-entry_log_bg = canvas.create_image(
-    250.5,
-    471.5,
-    image=entry_log_image
-)
+
 entry_log = Text(
     bd=0,
-    bg="#D0DFFF",
+    bg="#daede9",
     fg="#000716",
     highlightthickness=0,
     font=("Helvetica", 10)
