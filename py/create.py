@@ -10,21 +10,23 @@ def create_project(excel_file_path, headers, secret_info):
         excel_file = pd.read_excel(excel_file_path)
     except FileNotFoundError:
         print("The file was not found.")
-        return
+        return []
     except Exception as e: 
         print("There has been an error reading the file: {}".format(str(e)))
-        return
+        return []
 
     if "Name" not in excel_file.columns:
         print('Excel file must have a "Name" column.')
-        return
+        return []
     
     tasks_template = get_template(headers)
 
     if not tasks_template:
-        return
+        return []
 
     excel_file.dropna(subset=["Name"], inplace=True)
+
+    project_data_list = []
 
     for row in excel_file.iterrows():
         project_name = row[1]["Name"]
@@ -38,18 +40,21 @@ def create_project(excel_file_path, headers, secret_info):
 
         if project_response.status_code == 201:
             project_id = project_response.json()["id"]
-            print("Project '{}' created sucessfully. ID: {}".format(project_name, project_id))
+            print("Project '{}' created successfully. ID: {}".format(project_name, project_id))
             set_board(headers, project_id, secret_info["board_id"])
             clone_task(headers, project_id, secret_info["board_id"], tasks_template)
+
+            project_data_list.append(project_data)
 
         elif project_response.status_code == 422:
             print("Project '{}' cannot be created, already exists.".format(project_name))
 
         else:
             print("Error creating project '{}': {}".format(project_name, project_response.status_code))
-            return
+            return project_data_list
             
     print("\n\n")
+    return project_data_list
 
 def set_board(headers, project_id, board_id):
     project_update_url = f"https://runrun.it/api/v1.0/projects/{project_id}"

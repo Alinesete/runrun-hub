@@ -1,5 +1,4 @@
 import requests
-from datetime import date
 
 def get_client(headers):
     client_url = "https://runrun.it/api/v1.0/clients"
@@ -26,7 +25,7 @@ def get_tasks(headers, project_id, count):
     for page_num in range(1, page + 1):
         params = {"project_id": project_id, "page": page_num, "bypass_status_default" : True, "include_not_assigned" : True}
         tasks = get_list(task_url, headers, params)
-        task_dict.update({task["id"]: (task["title"], task["state"]) for task in tasks})
+        task_dict.update({task["id"]: (task["title"], task["state"], task["current_estimate_seconds"], task["time_worked"]) for task in tasks})
     return task_dict
 
 def calc_page(count):
@@ -40,35 +39,3 @@ def get_list(url, headers, params=None):
     else:
         print("Error: {}".format(response.status_code))
         return
-
-def max_hours(headers, task_id):
-    manual_work_url = "https://runrun.it/api/v1.0/manual_work_periods"
-    current_date = date.today().isoformat()
-
-    response_1 = requests.get(f"https://runrun.it/api/v1.0/tasks/{task_id}", headers=headers)
-    data_1 = response_1.json()
-
-    data = {
-        "manual_work_period": {
-            "task_id": task_id,
-            "seconds": data_1["current_estimate_seconds"],
-            "date_to_apply": current_date
-        }
-    }
-
-    response = requests.post(manual_work_url, json=data, headers=headers)
-
-    if response.status_code == 201:
-        print("{} seconds added to {}.".format(data_1["current_estimate_seconds"], task_id))
-    else:
-        print("Failed to add manual work period to task {}. Status code: {}".format(task_id,response.status_code))
-
-    response_2 = requests.post(f"https://runrun.it/api/v1.0/tasks/{task_id}/deliver", headers=headers)
-
-    if response_2.status_code == 200:
-        print("Task {} delivered.".format(task_id))
-    elif response_2.status_code == 422:
-        print("Warning: {}".format(task_id))
-    else:
-        print("Failed to deliver task {}. Status code: {}".format(task_id,response_2.status_code))
-    

@@ -5,21 +5,23 @@ import threading
 from pathlib import Path
 import tkinter as tk
 from tkinter import (
-Tk,
-Canvas,
-Text,
-Button,
-PhotoImage,
-Entry,
-StringVar,
-font,
-DISABLED,
-NORMAL,
-ttk,
+    Tk,
+    Canvas,
+    Text,
+    Button,
+    PhotoImage,
+    Entry,
+    StringVar,
+    ttk,
 )
 from tkinter.filedialog import askopenfilename
-from py.start_process import start_process
+from py.start import start_process
 from box import open_popup
+from bulk import bulk_popup
+from py.report import generate, log
+import subprocess
+import time
+import socket
 
 OUTPUT_PATH = Path(__file__).parent
 ASSETS_PATH = OUTPUT_PATH / Path(r".\assets")
@@ -27,10 +29,12 @@ ASSETS_PATH = OUTPUT_PATH / Path(r".\assets")
 wide = False
 client_list = {}
 client = []
+tasks = {}
 task_list = {}
 project = []
-task_list = {}
-tasks = []
+botoes = True
+task_frame = ""
+projects = []
 
 # -------------------------------------------
 
@@ -47,6 +51,60 @@ def redirect_stdout(widget):
 
     sys.stdout = StdoutRedirector(widget)
 
+def verificar_conexao():
+    global botoes
+
+    while True:
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(5)
+            resultado = sock.connect_ex(('35.190.30.45', 80))
+            sock.close()
+
+            if resultado == 0:
+                conexao_ruim = False
+            else:
+                conexao_ruim = True
+
+            if conexao_ruim:
+                canvas.itemconfig(bola, fill='red')
+                if botoes:
+                    desativar_elementos()
+            else:
+                canvas.itemconfig(bola, fill='green')
+                if not botoes:
+                    ativar_elementos()
+
+        except subprocess.CalledProcessError:
+            canvas.itemconfig(bola, fill='red')
+            if botoes:
+                desativar_elementos()
+        time.sleep(2)
+
+def desativar_elementos():
+    global botoes
+    combo_client.config(state='disabled')
+    combo_project.config(state='disabled')
+    btn_ref_client.config(state='disabled')
+    btn_bulk_project.config(state='disabled')
+    btn_att.config(state='disabled')
+    btn_start_project_creation.config(state='disabled')
+    btn_report_client.config(state='disabled')
+    btn_report_project.config(state='disabled')
+    botoes = False
+
+def ativar_elementos():
+    global botoes
+    combo_client.config(state='readonly')
+    combo_project.config(state='readonly')
+    btn_ref_client.config(state='normal')
+    btn_bulk_project.config(state='normal')
+    btn_att.config(state='normal')
+    btn_start_project_creation.config(state='normal')
+    btn_report_client.config(state='normal')
+    btn_report_project.config(state='normal')
+    botoes = True
+
 def relative_to_assets(path: str) -> Path:
     return ASSETS_PATH / Path(path)
 
@@ -61,95 +119,198 @@ def change_geometry():
         btn_expand.config(image=btn_expand_img_alt)
         wide = True
 
+
 def open_file_dialog():
     file_path = askopenfilename(filetypes=[("Excel Files", "*.xlsx")])
     entry_file.delete(0, "end")
     entry_file.insert(0, file_path)
 
-def get_client_id():
+
+def get_client_info():
     selected_name = combo_client.get()
     if not selected_name:
         print("Select a client")
-        return
+        return None
+
     for client_id, (name, projects_count) in client_list.items():
         if name == selected_name:
-            return client_id
+            return {client_id: projects_count}
+
     return None
 
-def get_project_id():
+def get_project_info(lst=None):
+    if lst is not None:
+        project_info = {}
+        for item in lst:
+            for project_id, (name, tasks_count) in task_list.items():
+                if name == item:
+                    project_info[project_id] = tasks_count
+        return project_info
+
     selected_name = combo_project.get()
     if not selected_name:
         print("Select a project")
         return
+    
+
     for project_id, (name, tasks_count) in task_list.items():
         if name == selected_name:
-            return project_id
+            return {project_id: tasks_count}
+
     return None
 
-def get_client_count():
-    selected_name = combo_client.get()
-    for client_id, (name, projects_count) in client_list.items():
-        if name == selected_name:
-            return projects_count
-    return None
-
-def get_project_count():
-    selected_name = combo_project.get()
-    for project_id, (name, tasks_count) in task_list.items():
-        if name == selected_name:
-            return tasks_count
-    return None
 
 # -------------------------------------------
+
 
 def refresh_client():
     global client
     global client_list
+
     client_list = start_process(2)
     client = [name for name, _ in client_list.values()]
     combo_client["values"] = client
 
 
 def refresh_project():
-    entry_log.delete("1.0", tk.END)
     global project
     global task_list
-    client_name = get_client_id()
-    client_count = get_client_count()
 
-    if not client_count:
-        print("There are no projects under the client {}.".format(client_name))
+    client_info = get_client_info()
+    if not client_info:
         return
 
-    task_list = start_process(3, client_name, client_count)
+    client_id, projects_count = list(client_info.items())[0]
+
+    if not projects_count:
+        print("There are no projects under the client with ID {}.".format(client_id))
+        return
+
+    task_list = start_process(3, client_id, projects_count)
     project = [name for name, _ in task_list.values()]
     combo_project["values"] = project
 
 def refresh_project_drop(event):
+    global task_frame
     refresh_project()
+    combo_project.set('')
 
-def refresh_task():
-    entry_log.delete("1.0", tk.END)
+    if task_frame:
+        task_frame.unbind_all("<MouseWheel>")
+        task_frame.destroy()
+
+def refresh_task_drop(event):
+    refresh_task()
+
+
+def refresh_task(bulk=None):
     global tasks
     global task_list
-    selected_project = get_project_id()
-    selected_count = get_project_count()
-    task_list = start_process(4, selected_project, selected_count)
-    open_popup(window, task_list, btn_att)
+    global task_frame
+    if task_frame:
+        task_frame.unbind_all("<MouseWheel>")
+        task_frame.destroy()
+        
+    extra = get_project_info(bulk)
+
+    task_list = start_process(4, extra)
+    task_frame, tasks = open_popup(window, task_list)
+    x1, y1, x2, y2 = 564, 173, 998, 487
+    rect_width = x2 - x1
+    rect_height = y2 - y1
+    task_frame.place(x=x1, y=y1, width=rect_width, height=rect_height)
     refresh_project()
 
+def bulk_project():
+    popup = bulk_popup(window, project)
+    window.wait_window(popup.popup_window)
+    selected_options = popup.get_selected_options()
+    if not selected_options:
+        print("No projects selected.")
+        return
+    refresh_task(selected_options)
+
 def start_project_creation():
-    entry_log.delete("1.0", tk.END)
     file_path = entry_file.get()
 
     if file_path.endswith(".xlsx"):
-        thread = threading.Thread(target=start_process, kwargs={"command": 1, "extra": file_path, "window":window, "button":btn_start_project_creation})
+        data = None
+
+        def target():
+            nonlocal data
+            data = start_process(command=1, extra=file_path, window=window, button=btn_start_project_creation)
+
+        thread = threading.Thread(target=target)
         thread.start()
-        
+        thread.join()
+
+        log(2, data)
+
     else:
         print("File must be XLSX.")
 
+
+def close_task():
+    global tasks, task_frame
+    task_list = tasks()
+    try:
+        start_process(5,task_list)
+        log(1, task_list)
+    except Exception as e:
+            print("An error occurred while creating the projects:", str(e))
+    task_frame.unbind_all("<MouseWheel>")
+    task_frame.destroy()
+
+def report(command, button, bulk=None):
+    button.config(state='disabled')
+    if command == 1:
+        main = get_project_info(bulk)
+        if not main:
+            return
+        id, count = list(main.items())[0]
+        if not count:
+            print("There are no tasks under the project with ID {}.".format(id))
+            return
+        extra = start_process(4, extra=main)
+
+        if not bulk:
+            name = combo_project.get()
+
+        try:
+            generate(1, extra, name)
+        except Exception as e:
+            print("An error occurred while writing to the CSV file:", str(e))
+
+    elif command == 2:
+        main = get_client_info()
+        if not main:
+            return
+        id, count = list(main.items())[0]
+        if not count:
+            print("There are no projects under the client with ID {}.".format(id))
+            return
+        extra = start_process(3, extra=main, count=count)
+
+        if not bulk:
+            name = combo_client.get()
+
+        try:
+            generate(2, extra, combo_client.get())
+        except Exception as e:
+            print("An error occurred while writing to the CSV file:", str(e))
+
+    else:
+        print("Selected does not exist or you don't have permissions.")
+    button.config(state='normal')
+    return
+
+def start_report(command,button, bulk=None):
+    thread = threading.Thread(target=report, args=(command, button, bulk))
+    thread.start()
+        
+
 # -------------------------------------------
+
 
 window = Tk()
 window.iconbitmap("./assets/icon.ico")
@@ -177,6 +338,12 @@ canvas.create_rectangle(
     fill="#FFFFFF",
     outline="")
 
+bola = canvas.create_oval(16, 19, 16 + 13, 19 + 13, fill='yellow')
+
+thread_ms = threading.Thread(target=verificar_conexao)
+thread_ms.daemon = True
+thread_ms.start()
+
 canvas.create_text(
     563.0,
     59.0,
@@ -194,23 +361,23 @@ combo_client = ttk.Combobox(
 combo_client.place(
     x=563.0,
     y=80.0,
-    width=402.0,
+    width=372.0,
     height=20.0
 )
 
 combo_client.bind("<<ComboboxSelected>>", refresh_project_drop)
 
-btn_ref_cliente_img = PhotoImage(
+btn_ref_img = PhotoImage(
     file=relative_to_assets("button_refresh.png"))
-btn_ref_cliente = Button(
-    image=btn_ref_cliente_img,
+btn_ref_client = Button(
+    image=btn_ref_img,
     borderwidth=0,
     highlightthickness=0,
     command=refresh_client,
     relief="flat"
 )
-btn_ref_cliente.place(
-    x=975.0,
+btn_ref_client.place(
+    x=942.0,
     y=80.0,
     width=23.0,
     height=20.0
@@ -227,26 +394,32 @@ canvas.create_text(
 
 combo_project = ttk.Combobox(
     window,
-    state="readonly"
+    values=project,
+    state="readonly",
+    justify="left",
+    height=5,
+    width=30,
 )
 combo_project.place(
     x=563.0,
     y=134.0,
-    width=402.0,
+    width=372.0,
     height=20.0
 )
 
-btn_ref_project_img = PhotoImage(
-    file=relative_to_assets("button_refresh.png"))
-btn_ref_project = Button(
-    image=btn_ref_project_img,
+combo_project.bind("<<ComboboxSelected>>", refresh_task_drop)
+
+bnt_bulk_project_img = PhotoImage(
+    file=relative_to_assets("button_bulk.png"))
+btn_bulk_project = Button(
+    image=bnt_bulk_project_img,
     borderwidth=0,
     highlightthickness=0,
-    command=refresh_project,
+    command=bulk_project,
     relief="flat"
 )
-btn_ref_project.place(
-    x=975.0,
+btn_bulk_project.place(
+    x=942.0,
     y=134.0,
     width=23.0,
     height=20.0
@@ -258,7 +431,7 @@ btn_att = Button(
     image=btn_att_img,
     borderwidth=0,
     highlightthickness=0,
-    command=refresh_task,
+    command=close_task,
     relief="flat"
 )
 btn_att.place(
@@ -268,10 +441,7 @@ btn_att.place(
     height=36.0
 )
 
-textbox = Text(canvas, bg="#D9D9D9", wrap="word")
-textbox.place(x=563.0, y=172.0, width=998.0-563.0, height=487.0-172.0)
-font_style = font.Font(family="Arial", size=10)
-textbox.configure(font=font_style)
+canvas.create_rectangle(563.0, 172.0, 998.0, 487.0, fill="#D9D9D9")
 
 # -------------------------------------------
 
@@ -351,6 +521,35 @@ btn_start_project_creation.place(
     height=61.0
 )
 
+btn_report = PhotoImage(
+    file=relative_to_assets("button_report.png"))
+btn_report_client = Button(
+    image=btn_report,
+    borderwidth=0,
+    highlightthickness=0,
+    command=lambda:start_report(1, btn_report_client),
+    relief="flat"
+)
+btn_report_client.place(
+    x=973.0,
+    y=134.0,
+    width=22.0,
+    height=20.0
+)
+
+btn_report_project = Button(
+    image=btn_report,
+    borderwidth=0,
+    highlightthickness=0,
+    command=lambda:start_report(2, btn_report_project),
+    relief="flat"
+)
+btn_report_project.place(
+    x=973.0,
+    y=80.0,
+    width=22.0,
+    height=20.0
+)
 
 entry_log = Text(
     bd=0,
