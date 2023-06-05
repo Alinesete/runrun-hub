@@ -12,13 +12,15 @@ def print_selected(task_name, task_entries):
 def get_selected_tasks(task_entries):
     selected_task_dict = {}
     for task_name, (entry_progress, task_worked, _, task_ids, checkbox_var) in task_entries.items():
-        task_worked = entry_progress.get()
+        time = entry_progress.get()
         try:
-            task_worked = float(task_worked)
+            time = float(time)
+            time = time * 3600
+            time = time - task_worked
         except ValueError:
-            task_worked = 0.0
+            time = 0.0
         if checkbox_var.get() != 0:
-            selected_task_dict[task_name] = (task_worked * 3600, task_ids)
+            selected_task_dict[task_name] = (time, task_ids)
     return selected_task_dict
 
 def open_popup(root, task_list):
