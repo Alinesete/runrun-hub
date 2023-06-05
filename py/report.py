@@ -2,7 +2,7 @@ from py.get import *
 from py.start import start_process
 import csv
 from datetime import datetime
-from datetime import date
+import getpass
 
 def time(seconds):
     hours = seconds // 3600
@@ -77,21 +77,40 @@ def generate(command, list, fileName):
 import os
 
 def log(command, data):
-    today = date.today().strftime("%d-%m-%Y")
-    
-    log_file_path = "tasklog.txt" if command == 1 else "newlog.txt"
-    
+    now = datetime.now()
+    today = now.strftime("%d-%m-%Y %H:%M:%S")
+    username = getpass.getuser()
+
+    log_file_path = "tasklog.csv" if command == 1 else "newlog.csv"
+
+    fieldnames = ["Date", "Username", "Title", "Hours Added", "IDs"]
+
     if not os.path.exists(log_file_path):
-        with open(log_file_path, "w") as log_file:
-            log_file.write("Date, Title, Hours Added, IDs\n")
-    
-    with open(log_file_path, "a") as log_file:
+        with open(log_file_path, "w", newline="") as log_file:
+            writer = csv.DictWriter(log_file, fieldnames=fieldnames)
+            writer.writeheader()
+
+    with open(log_file_path, "a", newline="") as log_file:
+        writer = csv.DictWriter(log_file, fieldnames=fieldnames)
+
         if command == 1:
             for title, (hours_added, ids) in data.items():
                 ids_str = ', '.join(str(id) for id in ids)
-                log_file.write(f"{today}, {title}, {hours_added}, {ids_str}\n")
+                writer.writerow({
+                    "Date": today,
+                    "Username": username,
+                    "Title": title,
+                    "Hours Added": (hours_added / 3600),
+                    "IDs": ids_str
+                })
         elif command == 2:
             for project, (name, client_id) in data.items():
-                log_file.write(f"{today}, {project}, {name}, {client_id}\n")
+                writer.writerow({
+                    "Date": today,
+                    "Username": username,
+                    "Title": project,
+                    "Name": name,
+                    "ID": client_id
+                })
 
-    print("Data appended to log.")
+    print("Data registered. You can see the log in {}".format(log_file_path))
