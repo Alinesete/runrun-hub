@@ -1,7 +1,8 @@
 import tkinter as tk
 from tkinter import ttk
 
-class bulk_popup:
+# Window will generate items for each task gotten, receive (parent, task_list)
+class BulkPopup:
     def __init__(self, parent, options):
         self.parent = parent
         self.options = options

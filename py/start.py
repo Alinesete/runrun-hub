@@ -1,9 +1,9 @@
-import tkinter as tk
 import os
+import tkinter as tk
 from cryptography.fernet import Fernet
 from py.create import create_project
-from py.get import get_client, get_project, get_tasks
-from py.deliver import att_task
+from py.get import get_client_dict, get_project_dict, get_tasks_dict
+from py.deliver import deliver_task
 
 def start_process(command, extra=None, count=None, window=None, button=None):
 
@@ -32,16 +32,16 @@ def start_process(command, extra=None, count=None, window=None, button=None):
         data = create_project(extra, headers, secret_info)
         print("End of process.")
     elif (command == 2):
-        data = get_client(headers)
+        data = get_client_dict(headers)
     elif (command == 3):
-        data = get_project(headers, extra, count)
+        data = get_project_dict(headers, extra, count)
 
     elif command == 4:
         tasks = {}
         title_tasks = {}
 
         for id, count in extra.items():
-            tasks[id] = get_tasks(headers, id, count)
+            tasks[id] = get_tasks_dict(headers, id, count)
             for task_id, (title, state, current_estimate_seconds, time_worked) in tasks[id].items():
                 if title in title_tasks:
                     title_tasks[title][3].append((task_id, id))
@@ -61,7 +61,7 @@ def start_process(command, extra=None, count=None, window=None, button=None):
         return common_title_tasks
 
     elif (command == 5):
-        att_task(headers, extra)
+        deliver_task(headers, extra)
         id_list = [str(id) for _, (_, ids) in extra.items() for id in ids]
         id_string = ', '.join(id_list)
         print("IDs changed:", id_string)
@@ -83,6 +83,7 @@ def read_file(filename):
         print(f"File '{filename}' not found. Try generating again.")
         return b''
 
+# Read the headers
 def get_keys():
     cache_folder = os.path.expanduser("~/runhub")
 

@@ -1,10 +1,11 @@
 import requests
-from datetime import date
 import math
+from datetime import datetime
 
-def att_task(headers, task_list):
+# Will deliver all tasks in tasl_list
+def deliver_task(headers, task_list):
     manual_work_url = "https://runrun.it/api/v1.0/manual_work_periods"
-    current_date = date.today().isoformat()
+    current_date = datetime.now()
 
     for title, (seconds, ids) in task_list.items():
         seconds = math.ceil(float(seconds))
@@ -15,14 +16,11 @@ def att_task(headers, task_list):
             if response_2.status_code == 200:
                 print("Task {} delivered.".format(task_id))
 
-                response_1 = requests.get(f"https://runrun.it/api/v1.0/tasks/{task_id}", headers=headers)
-                data_1 = response_1.json()
-
                 data = {
                     "manual_work_period": {
                         "task_id": task_id,
                         "seconds": seconds,
-                        "date_to_apply": current_date
+                        "date_to_apply": current_date.isoformat()
                     }
                 }
 
@@ -36,4 +34,3 @@ def att_task(headers, task_list):
                 print("Warning: Failed to deliver task {}. Task may already be delivered.".format(task_id))
             else:
                 print("Failed to deliver task {}. Status code: {}".format(task_id, response_2.status_code))
-            

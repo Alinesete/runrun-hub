@@ -1,4 +1,5 @@
-from tkinter import Canvas, Scrollbar, Frame, Checkbutton, IntVar, DISABLED, NORMAL, Entry, Label
+from tkinter import Canvas, Scrollbar, Frame, IntVar, DISABLED, NORMAL, Entry, Label
+from tkinter.ttk import Checkbutton
 
 def print_selected(task_name, task_entries):
     entry_progress, task_worked, task_total, _, checkbox_var = task_entries[task_name]
